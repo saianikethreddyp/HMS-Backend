@@ -3,8 +3,12 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  // Migrations need a session-level advisory lock, which Neon's pooled
+  // (PgBouncer transaction-mode) endpoint can't reliably hold -- point
+  // this at Neon's direct/unpooled connection string instead.
+  directUrl = env("DIRECT_URL")
 }
 
 enum StaffRole {
