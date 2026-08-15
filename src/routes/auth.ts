@@ -12,7 +12,7 @@ const loginSchema = z.object({
   login: z.string().min(1),
 });
 
-function setAuthCookies(res: import("express").Response, sessionId: string, expiresAt: Date) {
+function setAuthCookies(res: import("express").Response, sessionId: string, expiresAt: Date): string {
   res.cookie(env.SESSION_COOKIE_NAME, sessionId, {
     httpOnly: true,
     secure: isProduction,
@@ -28,14 +28,20 @@ function setAuthCookies(res: import("express").Response, sessionId: string, expi
     expires: expiresAt,
     path: "/",
   });
+  return csrfToken;
 }
 
 authRouter.post("/login", loginRateLimiter, async (req, res, next) => {
   try {
     const body = loginSchema.parse(req.body);
     const { session, expiresAt } = await authService.login(body.login);
-    setAuthCookies(res, session.sessionId, expiresAt);
-    res.json({ user: { name: session.name, login: session.login, role: session.role } });
+    const csrfToken = setAuthCookies(res, session.sessionId, expiresAt);
+    // The frontend and API live on different top-level domains in
+    // production, so page JS can never read the CSRF cookie via
+    // document.cookie -- hand it over in the body too. The cookie itself
+    // still gets sent automatically by the browser and is what
+    // requireCsrf actually checks against.
+    res.json({ user: { name: session.name, login: session.login, role: session.role }, csrfToken });
   } catch (err) {
     next(err);
   }
@@ -54,5 +60,12 @@ authRouter.post("/logout", requireCsrf, async (req, res, next) => {
 });
 
 authRouter.get("/me", requireAuth, (req, res) => {
-  res.json({ user: { name: req.session!.name, login: req.session!.login, role: req.session!.role } });
+  // Same cross-domain-cookie problem as /login: on a page reload the
+  // session cookie is still sent (httpOnly, browser-managed), but the app
+  // needs a fresh copy of the CSRF token from somewhere JS can read.
+  const csrfToken = req.cookies?.[env.CSRF_COOKIE_NAME] as string | undefined;
+  res.json({
+    user: { name: req.session!.name, login: req.session!.login, role: req.session!.role },
+    csrfToken,
+  });
 });
