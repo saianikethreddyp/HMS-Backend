@@ -1,0 +1,188 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum StaffRole {
+  ADMIN
+  STAFF
+}
+
+enum CardStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum PeriodStatus {
+  ACTIVE
+  EXPIRED
+  RENEWED
+}
+
+enum MemberStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum ServiceType {
+  OP
+  PHARMACY
+  DIAGNOSTIC
+}
+
+model StaffUser {
+  id        String    @id @default(uuid())
+  name      String
+  login     String    @unique
+  role      StaffRole @default(STAFF)
+  isActive  Boolean   @default(true) @map("is_active")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  sessions        Session[]
+  issuedPeriods   MembershipPeriod[] @relation("IssuedBy")
+  recordedUsages  ServiceUsage[]     @relation("RecordedBy")
+  voidedUsages    ServiceUsage[]     @relation("VoidedBy")
+  auditEvents     AuditEvent[]
+
+  @@map("staff_users")
+}
+
+model Session {
+  id           String   @id @default(uuid())
+  staffUserId  String   @map("staff_user_id")
+  expiresAt    DateTime @map("expires_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  staffUser StaffUser @relation(fields: [staffUserId], references: [id], onDelete: Cascade)
+
+  @@index([staffUserId])
+  @@map("sessions")
+}
+
+model MembershipOffer {
+  id              String   @id @default(uuid())
+  name            String
+  pricePaise      Int      @map("price_paise")
+  validityMonths  Int      @map("validity_months")
+  memberLimit     Int      @map("member_limit")
+  quotaTotal      Int      @map("quota_total")
+  isActive        Boolean  @default(true) @map("is_active")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  periods MembershipPeriod[]
+
+  @@map("membership_offers")
+}
+
+model MembershipCard {
+  id         String     @id @default(uuid())
+  cardNumber String     @unique @map("card_number")
+  village    String
+  phone      String
+  status     CardStatus @default(ACTIVE)
+  createdAt  DateTime   @default(now()) @map("created_at")
+  updatedAt  DateTime   @updatedAt @map("updated_at")
+
+  members  FamilyMember[]
+  periods  MembershipPeriod[]
+  usages   ServiceUsage[]
+
+  @@index([createdAt])
+  @@index([phone])
+  @@map("membership_cards")
+}
+
+model MembershipPeriod {
+  id           String       @id @default(uuid())
+  cardId       String       @map("card_id")
+  offerId      String?      @map("offer_id")
+  pricePaise   Int          @map("price_paise")
+  memberLimit  Int          @map("member_limit")
+  quotaTotal   Int          @map("quota_total")
+  quotaUsed    Int          @default(0) @map("quota_used")
+  startsOn     DateTime     @db.Date @map("starts_on")
+  endsOn       DateTime     @db.Date @map("ends_on")
+  status       PeriodStatus @default(ACTIVE)
+  issuedById   String       @map("issued_by")
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+
+  card    MembershipCard   @relation(fields: [cardId], references: [id])
+  offer   MembershipOffer? @relation(fields: [offerId], references: [id])
+  issuedBy StaffUser       @relation("IssuedBy", fields: [issuedById], references: [id])
+  usages  ServiceUsage[]
+
+  @@index([cardId])
+  @@index([status])
+  @@index([status, endsOn])
+  // Partial unique index enforcing at most one ACTIVE period per card is
+  // added via raw SQL in the migration (Prisma schema can't express WHERE
+  // clauses on indexes) — see prisma/migrations/*/migration.sql.
+  @@map("membership_periods")
+}
+
+model FamilyMember {
+  id        String       @id @default(uuid())
+  cardId    String       @map("card_id")
+  name      String
+  age       Int
+  gender    String
+  status    MemberStatus @default(ACTIVE)
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+
+  card   MembershipCard @relation(fields: [cardId], references: [id])
+  usages ServiceUsage[]
+
+  @@index([cardId])
+  @@map("family_members")
+}
+
+model ServiceUsage {
+  id             String      @id @default(uuid())
+  periodId       String      @map("membership_period_id")
+  cardId         String      @map("card_id")
+  memberId       String      @map("member_id")
+  serviceType    ServiceType @map("service_type")
+  occurredAt     DateTime    @default(now()) @map("occurred_at")
+  recordedById   String      @map("recorded_by")
+  idempotencyKey String      @unique @map("idempotency_key")
+  voidedAt       DateTime?   @map("voided_at")
+  voidedById     String?     @map("voided_by")
+  voidReason     String?     @map("void_reason")
+  createdAt      DateTime    @default(now()) @map("created_at")
+
+  period     MembershipPeriod @relation(fields: [periodId], references: [id])
+  card       MembershipCard   @relation(fields: [cardId], references: [id])
+  member     FamilyMember     @relation(fields: [memberId], references: [id])
+  recordedBy StaffUser        @relation("RecordedBy", fields: [recordedById], references: [id])
+  voidedBy   StaffUser?       @relation("VoidedBy", fields: [voidedById], references: [id])
+
+  @@index([periodId])
+  @@index([cardId, occurredAt])
+  @@index([occurredAt])
+  @@index([voidedAt])
+  @@map("service_usages")
+}
+
+model AuditEvent {
+  id            String   @id @default(uuid())
+  actorId       String?  @map("actor_id")
+  action        String
+  entityType    String   @map("entity_type")
+  entityId      String   @map("entity_id")
+  metadata      Json?
+  correlationId String?  @map("correlation_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  actor StaffUser? @relation(fields: [actorId], references: [id])
+
+  @@index([entityType, entityId])
+  @@map("audit_events")
+}
