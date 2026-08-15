@@ -26,6 +26,15 @@ export function countUsagesInRange(client: Client, start: Date, end: Date) {
   });
 }
 
+export async function countCardsUsedInRange(client: Client, start: Date, end: Date) {
+  const rows = await client.serviceUsage.findMany({
+    where: { voidedAt: null, occurredAt: { gte: start, lt: end } },
+    distinct: ["cardId"],
+    select: { cardId: true },
+  });
+  return rows.length;
+}
+
 export async function serviceTypeBreakdown(client: Client) {
   const rows = await client.serviceUsage.groupBy({
     by: ["serviceType"],

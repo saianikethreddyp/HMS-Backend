@@ -105,6 +105,9 @@ describe("getSummary", () => {
       // OP + PHARMACY recorded, DIAGNOSTIC voided and excluded.
       expect(summary.serviceBreakdown).toEqual({ OP: 1, PHARMACY: 1, DIAGNOSTIC: 0 });
       expect(summary.todayUsageCount).toBe(2);
+      // Both non-voided usages were recorded against the same card, so the
+      // distinct-card count should be 1 even though the usage count is 2.
+      expect(summary.cardsUsedToday).toBe(1);
     },
     SEED_LEDGER_TIMEOUT,
   );

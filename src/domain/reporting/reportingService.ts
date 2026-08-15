@@ -22,6 +22,7 @@ async function computeSummary() {
     expiringSoonCards,
     totalMembers,
     todayUsageCount,
+    cardsUsedToday,
     serviceBreakdown,
   ] = await Promise.all([
     reportRepo.countActivePeriods(prisma),
@@ -29,6 +30,7 @@ async function computeSummary() {
     reportRepo.countExpiringSoon(prisma, todayStart, expiringWindowEnd),
     reportRepo.countActiveMembers(prisma),
     reportRepo.countUsagesInRange(prisma, todayStart, todayEnd),
+    reportRepo.countCardsUsedInRange(prisma, todayStart, todayEnd),
     reportRepo.serviceTypeBreakdown(prisma),
   ]);
 
@@ -40,6 +42,7 @@ async function computeSummary() {
     expiringSoonCards,
     totalMembers,
     todayUsageCount,
+    cardsUsedToday,
     serviceBreakdown,
     totalTransactions,
   };
