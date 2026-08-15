@@ -8,6 +8,11 @@ const envSchema = z.object({
   SESSION_COOKIE_NAME: z.string().min(1).default("hms_sid"),
   CSRF_COOKIE_NAME: z.string().min(1).default("hms_csrf"),
   SESSION_TTL_HOURS: z.coerce.number().int().positive().default(12),
+  // Used to auto-provision the first admin account and default membership
+  // offer on server startup when the database has none yet -- see
+  // bootstrap.ts. Defaulted so this works with zero configuration.
+  SEED_ADMIN_LOGIN: z.string().min(1).default("admin"),
+  SEED_ADMIN_NAME: z.string().min(1).default("Administrator"),
 });
 
 function loadEnv() {
