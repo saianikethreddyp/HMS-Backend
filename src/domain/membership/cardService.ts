@@ -53,6 +53,18 @@ export async function issueCard(input: IssueCardInput, actorId: string) {
     );
   }
 
+  // Phone is unique per card so a member who forgets their card number can
+  // always be found by phone with exactly one match. Pre-check for a clear
+  // error message; the column's own unique constraint is the real guard
+  // against a concurrent-registration race.
+  const existingByPhone = await cardRepo.findCardByPhone(prisma, input.phone);
+  if (existingByPhone) {
+    throw new DomainError(
+      "PHONE_ALREADY_REGISTERED",
+      "This phone number is already registered to another card.",
+    );
+  }
+
   const startsOn = toDateOnly(input.startsOn ?? new Date());
   const endsOn = computePeriodEnd(startsOn, offer.validityMonths);
 

@@ -88,7 +88,9 @@ model MembershipCard {
   id         String     @id @default(uuid())
   cardNumber String     @unique @map("card_number")
   village    String
-  phone      String
+  // Unique so a member who forgets their card number can always be found
+  // by phone with exactly one match, not several.
+  phone      String     @unique
   status     CardStatus @default(ACTIVE)
   createdAt  DateTime   @default(now()) @map("created_at")
   updatedAt  DateTime   @updatedAt @map("updated_at")
@@ -98,7 +100,6 @@ model MembershipCard {
   usages   ServiceUsage[]
 
   @@index([createdAt])
-  @@index([phone])
   @@map("membership_cards")
 }
 

@@ -79,4 +79,18 @@ describe("issueCard", () => {
       ),
     ).rejects.toMatchObject({ code: "MEMBER_LIMIT_REACHED" });
   });
+
+  it("rejects a second card registered with a phone number already in use", async () => {
+    const { staff } = await createStaff({ role: "ADMIN" });
+    await createOffer();
+
+    await issueCard({ village: "Rampur", phone: "9876543210", members: fourMembers }, staff.id);
+
+    await expect(
+      issueCard({ village: "Another Village", phone: "9876543210", members: fourMembers }, staff.id),
+    ).rejects.toMatchObject({ code: "PHONE_ALREADY_REGISTERED" });
+
+    const cardsWithPhone = await prisma.membershipCard.count({ where: { phone: "9876543210" } });
+    expect(cardsWithPhone).toBe(1);
+  });
 });

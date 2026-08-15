@@ -17,6 +17,10 @@ export function findCardByNumber(client: Client, cardNumber: string) {
   return client.membershipCard.findUnique({ where: { cardNumber } });
 }
 
+export function findCardByPhone(client: Client, phone: string) {
+  return client.membershipCard.findUnique({ where: { phone } });
+}
+
 const cardDetailInclude = {
   members: { orderBy: { createdAt: "asc" } },
   periods: {
