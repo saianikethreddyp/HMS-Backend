@@ -237,10 +237,12 @@ describe("renewCard", () => {
 
   it("allows renewal once the period has expired, even with quota remaining", async () => {
     const { staff } = await createStaff({ role: "ADMIN" });
+    const pastStart = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
     const pastEnd = new Date(Date.now() - 24 * 60 * 60 * 1000);
     const { card, period: oldPeriod } = await createCardWithActivePeriod({
       issuedById: staff.id,
       quotaUsed: 2,
+      startsOn: pastStart,
       endsOn: pastEnd,
     });
 

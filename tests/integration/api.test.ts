@@ -41,25 +41,34 @@ describe("auth", () => {
 });
 
 describe("staff usage flow end-to-end", () => {
-  it("logs in, finds an active card, records OP, and sees one fewer use", async () => {
-    const { staff, login } = await createStaff({ role: "STAFF" });
-    const { card, member } = await createCardWithActivePeriod({ issuedById: staff.id });
+  it(
+    "logs in, finds an active card, records OP, and sees one fewer use",
+    async () => {
+      const { staff, login } = await createStaff({ role: "STAFF" });
+      const { card, member } = await createCardWithActivePeriod({ issuedById: staff.id });
 
-    const { cookies, csrfToken } = await loginAs(login);
+      const { cookies, csrfToken } = await loginAs(login);
 
-    const record = await request(app)
-      .post("/usages")
-      .set("Cookie", cookies)
-      .set("x-csrf-token", csrfToken)
-      .send({ cardId: card.id, memberId: member.id, serviceType: "OP", idempotencyKey: "flow-1" });
-    expect(record.status).toBe(201);
-    expect(record.body.after).toBe(19);
+      const record = await request(app)
+        .post("/usages")
+        .set("Cookie", cookies)
+        .set("x-csrf-token", csrfToken)
+        .send({ cardId: card.id, memberId: member.id, serviceType: "OP", idempotencyKey: "flow-1" });
+      expect(record.status).toBe(201);
+      expect(record.body.after).toBe(19);
 
-    const detail = await request(app).get(`/cards/${card.id}`).set("Cookie", cookies);
-    expect(detail.status).toBe(200);
-    const activePeriod = detail.body.card.periods.find((p: { status: string }) => p.status === "ACTIVE");
-    expect(activePeriod.quotaUsed).toBe(1);
-  });
+      const detail = await request(app).get(`/cards/${card.id}`).set("Cookie", cookies);
+      expect(detail.status).toBe(200);
+      const activePeriod = detail.body.card.periods.find((p: { status: string }) => p.status === "ACTIVE");
+      expect(activePeriod.quotaUsed).toBe(1);
+    },
+    // This test chains ~8 sequential round trips (staff/card/period/member
+    // inserts, login, a transactional usage record, and a detail fetch)
+    // over the pooled Neon connection used in this environment; the default
+    // 20s per-test timeout is too tight for that -- see the same note on
+    // seedLedger in reporting.test.ts.
+    60000,
+  );
 
   it("blocks recording usage without authentication", async () => {
     const { staff } = await createStaff();
